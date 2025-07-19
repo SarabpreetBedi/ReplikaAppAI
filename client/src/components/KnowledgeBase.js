@@ -347,8 +347,7 @@ function KnowledgeBase({ user }) {
   const handleDelete = async (documentId) => {
     if (window.confirm('Are you sure you want to delete this document?')) {
       try {
-        // Note: You'll need to add a delete endpoint to your server
-        // await axios.delete(`/api/knowledge/${documentId}`);
+        await axios.delete(`/api/knowledge/${documentId}`);
         toast.success('Document deleted successfully!');
         fetchDocuments();
       } catch (error) {
@@ -356,6 +355,34 @@ function KnowledgeBase({ user }) {
         toast.error('Failed to delete document');
       }
     }
+  };
+
+  const handleView = (document) => {
+    // Create a modal or new window to show the full content
+    const fullContent = document.content;
+    const newWindow = window.open('', '_blank');
+    newWindow.document.write(`
+      <html>
+        <head>
+          <title>${document.title}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; }
+            h1 { color: #333; }
+            .content { max-width: 800px; margin: 0 auto; }
+          </style>
+        </head>
+        <body>
+          <div class="content">
+            <h1>${document.title}</h1>
+            <p><strong>File Type:</strong> ${document.file_type}</p>
+            <p><strong>Uploaded:</strong> ${new Date(document.created_at).toLocaleDateString()}</p>
+            <hr>
+            <div style="white-space: pre-wrap;">${fullContent}</div>
+          </div>
+        </body>
+      </html>
+    `);
+    newWindow.document.close();
   };
 
   const getFileIcon = (fileType) => {
@@ -485,7 +512,7 @@ function KnowledgeBase({ user }) {
               </DocumentContent>
 
               <DocumentActions>
-                <ActionButton className="view">
+                <ActionButton className="view" onClick={() => handleView(doc)}>
                   <FiEye />
                   View
                 </ActionButton>

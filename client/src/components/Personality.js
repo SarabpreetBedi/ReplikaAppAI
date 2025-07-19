@@ -381,22 +381,12 @@ function Personality({ user }) {
 
   const fetchPersonalities = async () => {
     try {
-      // Mock data for now - you'll need to implement the API endpoint
-      const mockPersonalities = [
-        {
-          id: '1',
-          name: 'Friendly Companion',
-          description: 'A warm, empathetic AI that provides emotional support and engaging conversation.',
-          traits: ['empathetic', 'supportive', 'encouraging', 'positive']
-        },
-        {
-          id: '2',
-          name: 'Professional Assistant',
-          description: 'A focused, efficient AI that helps with productivity and task management.',
-          traits: ['efficient', 'organized', 'helpful', 'professional']
-        }
-      ];
-      setPersonalities(mockPersonalities);
+      const response = await axios.get(`/api/personality/${user.userId}`);
+      const personalities = response.data.map(p => ({
+        ...p,
+        traits: typeof p.traits === 'string' ? JSON.parse(p.traits) : p.traits
+      }));
+      setPersonalities(personalities);
     } catch (error) {
       console.error('Error fetching personalities:', error);
       toast.error('Failed to load personalities');
@@ -411,11 +401,11 @@ function Personality({ user }) {
     try {
       if (editingPersonality) {
         // Update existing personality
-        // await axios.put(`/api/personality/${editingPersonality.id}`, formData);
+        await axios.put(`/api/personality/${editingPersonality.id}`, formData);
         toast.success('Personality updated successfully!');
       } else {
         // Create new personality
-        // await axios.post('/api/personality', { ...formData, userId: user.userId });
+        await axios.post('/api/personality', { ...formData, userId: user.userId });
         toast.success('Personality created successfully!');
       }
       
@@ -444,7 +434,7 @@ function Personality({ user }) {
   const handleDelete = async (personalityId) => {
     if (window.confirm('Are you sure you want to delete this personality?')) {
       try {
-        // await axios.delete(`/api/personality/${personalityId}`);
+        await axios.delete(`/api/personality/${personalityId}`);
         toast.success('Personality deleted successfully!');
         fetchPersonalities();
       } catch (error) {

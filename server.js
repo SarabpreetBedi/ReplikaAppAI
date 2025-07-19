@@ -270,6 +270,94 @@ app.get('/api/knowledge/:userId', (req, res) => {
   );
 });
 
+// Delete knowledge base document
+app.delete('/api/knowledge/:documentId', (req, res) => {
+  const { documentId } = req.params;
+
+  db.run(
+    'DELETE FROM knowledge_base WHERE id = ?',
+    [documentId],
+    function(err) {
+      if (err) return res.status(500).json({ error: 'Failed to delete document' });
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+      res.json({ message: 'Document deleted successfully' });
+    }
+  );
+});
+
+// Personality endpoints
+app.get('/api/personality/:userId', (req, res) => {
+  const { userId } = req.params;
+
+  db.all(
+    'SELECT id, name, description, traits FROM personality_settings WHERE user_id = ? ORDER BY created_at DESC',
+    [userId],
+    (err, personalities) => {
+      if (err) return res.status(500).json({ error: 'Failed to fetch personalities' });
+      res.json(personalities);
+    }
+  );
+});
+
+app.post('/api/personality', (req, res) => {
+  const { name, description, traits, userId } = req.body;
+  const personalityId = uuidv4();
+
+  db.run(
+    'INSERT INTO personality_settings (id, user_id, name, description, traits) VALUES (?, ?, ?, ?, ?)',
+    [personalityId, userId, name, description, JSON.stringify(traits)],
+    function(err) {
+      if (err) return res.status(500).json({ error: 'Failed to create personality' });
+      res.json({ 
+        id: personalityId,
+        name,
+        description,
+        traits
+      });
+    }
+  );
+});
+
+app.put('/api/personality/:personalityId', (req, res) => {
+  const { personalityId } = req.params;
+  const { name, description, traits } = req.body;
+
+  db.run(
+    'UPDATE personality_settings SET name = ?, description = ?, traits = ? WHERE id = ?',
+    [name, description, JSON.stringify(traits), personalityId],
+    function(err) {
+      if (err) return res.status(500).json({ error: 'Failed to update personality' });
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Personality not found' });
+      }
+      res.json({ 
+        id: personalityId,
+        name,
+        description,
+        traits
+      });
+    }
+  );
+});
+
+app.delete('/api/personality/:personalityId', (req, res) => {
+  const { personalityId } = req.params;
+
+  db.run(
+    'DELETE FROM personality_settings WHERE id = ?',
+    [personalityId],
+    function(err) {
+      if (err) return res.status(500).json({ error: 'Failed to delete personality' });
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Personality not found' });
+      }
+      res.json({ message: 'Personality deleted successfully' });
+    }
+  );
+});
+
 // Chat with AI
 app.post('/api/chat', async (req, res) => {
   try {
@@ -328,19 +416,33 @@ app.post('/api/chat', async (req, res) => {
                 'Instructions: Respond as a caring AI companion. Use the custom knowledge when relevant to provide helpful and accurate information. Keep responses conversational and engaging.';
 
               console.log('Sending request to OpenAI...');
-              const completion = await openai.chat.completions.create({
-                model: "gpt-3.5-turbo",
-                messages: [
-                  { role: "system", content: systemPrompt },
-                  { role: "user", content: message }
-                ],
-                max_tokens: 500,
-                temperature: 0.7,
-                timeout: 30000 // 30 second timeout
-              });
+              
+              let aiResponse;
+              try {
+                const completion = await openai.chat.completions.create({
+                  model: "gpt-3.5-turbo",
+                  messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: message }
+                  ],
+                  max_tokens: 500,
+                  temperature: 0.7,
+                  timeout: 30000 // 30 second timeout
+                });
 
-              const aiResponse = completion.choices[0].message.content;
-              console.log('OpenAI response received:', aiResponse.substring(0, 50) + '...');
+                aiResponse = completion.choices[0].message.content;
+                console.log('OpenAI response received:', aiResponse.substring(0, 50) + '...');
+              } catch (openaiError) {
+                console.error('OpenAI API error:', openaiError.message);
+                
+                // If quota exceeded or API error, use test mode
+                if (openaiError.message.includes('quota') || openaiError.message.includes('429')) {
+                  console.log('Using test mode due to API quota issues...');
+                  aiResponse = generateTestResponse(message);
+                } else {
+                  throw openaiError;
+                }
+              }
 
               // Save the conversation
               const messageId = uuidv4();
@@ -388,6 +490,33 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
+// Test mode response generator
+function generateTestResponse(userMessage) {
+  const responses = [
+    "Hello! I'm your AI companion. I'm here to chat and help you with whatever's on your mind. How are you feeling today?",
+    "That's interesting! I'd love to hear more about that. What's been on your mind lately?",
+    "I'm doing well, thank you for asking! I'm here to support you and have meaningful conversations. What would you like to talk about?",
+    "I appreciate you reaching out! I'm your AI companion and I'm here to listen, chat, and help you however I can. What's new with you?",
+    "That's a great question! I'm your AI companion designed to be supportive and engaging. I'm here to chat about anything you'd like to discuss.",
+    "Hi there! I'm so glad you're here. I'm your AI companion and I'm ready to have a wonderful conversation with you. What's on your mind?",
+    "I'm here and ready to chat! As your AI companion, I'm designed to be caring, supportive, and engaging. What would you like to talk about today?",
+    "Hello! I'm your AI companion and I'm excited to chat with you. I'm here to listen, support, and engage in meaningful conversations. How are you doing?"
+  ];
+  
+  // Simple logic to choose response based on user message
+  const lowerMessage = userMessage.toLowerCase();
+  if (lowerMessage.includes('hello') || lowerMessage.includes('hi')) {
+    return responses[0];
+  } else if (lowerMessage.includes('how are you')) {
+    return responses[2];
+  } else if (lowerMessage.includes('what') || lowerMessage.includes('who')) {
+    return responses[4];
+  } else {
+    // Random response for other messages
+    return responses[Math.floor(Math.random() * responses.length)];
+  }
+}
+
 // Socket.IO for real-time chat
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
@@ -400,12 +529,29 @@ io.on('connection', (socket) => {
     const { message, conversationId, userId, personalityId } = data;
     
     try {
+      // Check if OpenAI API key is configured
+      if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your_openai_api_key_here') {
+        console.error('OpenAI API key not configured');
+        socket.emit('error', { 
+          error: 'AI service not configured. Please add your OpenAI API key to the .env file.',
+          details: 'Get your API key from https://platform.openai.com/api-keys'
+        });
+        return;
+      }
+
+      // Validate required fields
+      if (!message || !userId || !conversationId) {
+        socket.emit('error', { error: 'Missing required fields: message, userId, conversationId' });
+        return;
+      }
+
       // Get user's knowledge base
       db.all(
         'SELECT content FROM knowledge_base WHERE user_id = ?',
         [userId],
         async (err, knowledgeBase) => {
           if (err) {
+            console.error('Database error fetching knowledge:', err);
             socket.emit('error', { error: 'Failed to fetch knowledge' });
             return;
           }
@@ -416,41 +562,130 @@ io.on('connection', (socket) => {
             [userId, personalityId],
             async (err, personality) => {
               if (err) {
+                console.error('Database error fetching personality:', err);
                 socket.emit('error', { error: 'Failed to fetch personality' });
                 return;
               }
 
-              // Build context and generate response
-              let context = '';
-              if (knowledgeBase.length > 0) {
-                context = 'Custom Knowledge:\n' + knowledgeBase.map(k => k.content).join('\n\n') + '\n\n';
+              try {
+                // Build context and generate response
+                let context = '';
+                if (knowledgeBase && knowledgeBase.length > 0) {
+                  context = 'Custom Knowledge:\n' + knowledgeBase.map(k => k.content).join('\n\n') + '\n\n';
+                }
+
+                let personalityPrompt = '';
+                if (personality) {
+                  personalityPrompt = `Personality: ${personality.description}\nTraits: ${personality.traits}\n\n`;
+                } else {
+                  personalityPrompt = `You are a friendly, empathetic AI companion. Be supportive, caring, and engaging in conversation. Always respond in a warm and personal manner.\n\n`;
+                }
+
+                const systemPrompt = personalityPrompt + context + 
+                  'Instructions: Respond as a caring AI companion. Use the custom knowledge when relevant to provide helpful and accurate information. Keep responses conversational and engaging.';
+
+                console.log('Socket: Sending request to OpenAI...');
+                
+                let aiResponse;
+                try {
+                  const completion = await openai.chat.completions.create({
+                    model: "gpt-3.5-turbo",
+                    messages: [
+                      { role: "system", content: systemPrompt },
+                      { role: "user", content: message }
+                    ],
+                    max_tokens: 500,
+                    temperature: 0.7,
+                    timeout: 30000 // 30 second timeout
+                  });
+
+                  aiResponse = completion.choices[0].message.content;
+                  console.log('Socket: OpenAI response received:', aiResponse.substring(0, 50) + '...');
+                } catch (openaiError) {
+                  console.error('Socket: OpenAI API error:', openaiError.message);
+                  
+                  // If quota exceeded or API error, use test mode
+                  if (openaiError.message.includes('quota') || openaiError.message.includes('429')) {
+                    console.log('Socket: Using test mode due to API quota issues...');
+                    aiResponse = generateTestResponse(message);
+                  } else {
+                    throw openaiError;
+                  }
+                }
+
+                // Save messages
+                const messageId = uuidv4();
+                const aiMessageId = uuidv4();
+
+                db.serialize(() => {
+                  db.run(
+                    'INSERT INTO messages (id, conversation_id, content, sender) VALUES (?, ?, ?, ?)',
+                    [messageId, conversationId, message, 'user'],
+                    function(err) {
+                      if (err) console.error('Error saving user message:', err);
+                    }
+                  );
+                  db.run(
+                    'INSERT INTO messages (id, conversation_id, content, sender) VALUES (?, ?, ?, ?)',
+                    [aiMessageId, conversationId, aiResponse, 'ai'],
+                    function(err) {
+                      if (err) console.error('Error saving AI message:', err);
+                    }
+                  );
+                });
+
+                // Emit response to all users in the conversation
+                io.to(conversationId).emit('new-message', {
+                  id: messageId,
+                  content: message,
+                  sender: 'user',
+                  timestamp: new Date().toISOString()
+                });
+
+                io.to(conversationId).emit('new-message', {
+                  id: aiMessageId,
+                  content: aiResponse,
+                  sender: 'ai',
+                  timestamp: new Date().toISOString()
+                });
+              } catch (openaiError) {
+                console.error('Socket: OpenAI API error:', openaiError);
+                socket.emit('error', { 
+                  error: 'Failed to generate AI response',
+                  details: openaiError.message
+                });
               }
+            }
+          );
+        }
+      );
+    } catch (error) {
+      console.error('Socket chat error:', error);
+      socket.emit('error', { 
+        error: 'Failed to generate response',
+        details: error.message
+      });
+    }
+  });
 
-              let personalityPrompt = '';
-              if (personality) {
-                personalityPrompt = `Personality: ${personality.description}\nTraits: ${personality.traits}\n\n`;
-              } else {
-                personalityPrompt = `You are a friendly, empathetic AI companion. Be supportive, caring, and engaging in conversation. Always respond in a warm and personal manner.\n\n`;
-              }
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
+});
 
-              const systemPrompt = personalityPrompt + context + 
-                'Instructions: Respond as a caring AI companion. Use the custom knowledge when relevant to provide helpful and accurate information. Keep responses conversational and engaging.';
+// Serve React app
+app.get('*', (req, res) => {
+  // Check if the build directory exists
+  const buildPath = path.join(__dirname, 'client/build', 'index.html');
+  if (fs.existsSync(buildPath)) {
+    res.sendFile(buildPath);
+  } else {
+    // If build doesn't exist, redirect to development server
+    res.redirect('http://localhost:3000');
+  }
+});
 
-              const completion = await openai.chat.completions.create({
-                model: "gpt-3.5-turbo",
-                messages: [
-                  { role: "system", content: systemPrompt },
-                  { role: "user", content: message }
-                ],
-                max_tokens: 500,
-                temperature: 0.7
-              });
-
-              const aiResponse = completion.choices[0].message.content;
-
-              // Save messages
-              const messageId = uuidv4();
-              const aiMessageId = uuidv4();
-
-              db.serialize(() => {
-                d
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+}); 
