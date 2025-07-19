@@ -294,7 +294,8 @@ For issues and questions:
 
 | Step  | Screenshot |
 |-------|------------|
-| 1     | ![Supabase Step 1](.devcontainer/Supabase.png) |
-| 2     | ![Supabase Step 2](.devcontainer/Supabase2.png) |
-| 3     | ![Supabase Step 3](.devcontainer/Supabase3.png) |
-| 4     | ![Supabase Step 4](.devcontainer/Supabase4.png) | 
+| 1     | ![ReplikaApp Step 1](screenshots/ReplikaApp.png) |
+| 2     | ![ReplikaAppe Step 2](screenshots/ReplikaApp2.png) |
+| 3     | ![ReplikaApp Step 3](screenshots/ReplikaApp3.png) |
+| 4     | ![ReplikaApp Step 4](screenshots/ReplikaApp4.png) | 
+| 5     | ![ReplikaApp Step 5](screenshots/ReplikaApp5.png) | 
