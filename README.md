@@ -287,3 +287,14 @@ For issues and questions:
 - [ ] API rate limiting
 - [ ] Advanced analytics
 - [ ] Plugin system 
+
+
+
+## ReplikaApp AI Setup Screenshots
+
+| Step  | Screenshot |
+|-------|------------|
+| 1     | ![Supabase Step 1](.devcontainer/Supabase.png) |
+| 2     | ![Supabase Step 2](.devcontainer/Supabase2.png) |
+| 3     | ![Supabase Step 3](.devcontainer/Supabase3.png) |
+| 4     | ![Supabase Step 4](.devcontainer/Supabase4.png) | 
