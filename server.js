@@ -7,6 +7,19 @@ const fs = require('fs-extra');
 const { v4: uuidv4 } = require('uuid');
 require('dotenv').config();
 
+// Log stream for application logs
+const logStream = fs.createWriteStream(path.join(__dirname, 'replika.log'), { flags: 'a' });
+const origConsoleLog = console.log;
+const origConsoleError = console.error;
+console.log = function(...args) {
+  origConsoleLog.apply(console, args);
+  logStream.write('[LOG] ' + args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ') + '\n');
+};
+console.error = function(...args) {
+  origConsoleError.apply(console, args);
+  logStream.write('[ERROR] ' + args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ') + '\n');
+};
+
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {

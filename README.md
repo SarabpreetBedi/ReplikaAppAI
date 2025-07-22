@@ -87,6 +87,7 @@ A modern, full-stack AI companion application with custom knowledge capabilities
 
    # In a new terminal, start the client
    cd client
+   npm run build
    npm start
    ```
 
